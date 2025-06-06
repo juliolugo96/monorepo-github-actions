@@ -46,7 +46,7 @@ jobs:
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
 
       - name: Validate Matrix
-        if: ${{ steps.get-matrix.outputs.matrix == '{"include": []}' }}
+        if: ${{ fromJson(steps.get-matrix.outputs.matrix).include.length == 0 }}
         run: |
           echo "No services with a Dockerfile were changed. Exiting."
           exit 1
@@ -55,7 +55,7 @@ jobs:
     name: Build & Push Docker Images
     needs: detect
     runs-on: ubuntu-latest
-    if: ${{ needs.detect.outputs.matrix != '{"include": []}' }}
+    if: ${{ fromJson(needs.detect.outputs.matrix).include.length > 0 }}
     strategy:
       matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
     env:
