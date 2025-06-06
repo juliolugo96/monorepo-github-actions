@@ -1,1 +1,1 @@
-print('Hello from service-a, small change')
+print('Hello from service-a')
