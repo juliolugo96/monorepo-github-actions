@@ -81,7 +81,7 @@ jobs:
           context: ./app/${{ matrix.service }}
           file: ./app/${{ matrix.service }}/Dockerfile
           push: true
-          tags: juliolugo96/${{ matrix.service }}:${{ github.sha }},juliolugo96/${{ matrix.service }}:latest
+          tags: ghcr.io/juliolugo96/${{ matrix.service }}:${{ github.sha }},ghcr.io/juliolugo96/${{ matrix.service }}:latest
 
       # - name: Trigger ArgoCD Deployment for ${{ matrix.service }}
       #   env:
