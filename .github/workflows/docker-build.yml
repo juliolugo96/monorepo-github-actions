@@ -26,12 +26,9 @@ jobs:
           CHANGED_FOLDERS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} app | awk -F/ '!($2 ~ /^(Dockerfile|SomeFileYouDoNotWantToDetect|Makefile)$/) {print $2}' | sort -u | xargs)
           echo "Changed folders: $CHANGED_FOLDERS"
 
-          CHANGED_SERVICES=$(echo "$CHANGED_FOLDERS" | grep "^app/" | awk -F'/' '{print $2}' | sort -u)
-          echo "Changed services: $CHANGED_SERVICES"
-
           matrix="{\"include\": ["
           first=1
-          for service in $CHANGED_SERVICES; do
+          for service in $CHANGED_FOLDERS; do
             if [ -f "app/${service}/Dockerfile" ]; then
               if [ $first -eq 0 ]; then
                 matrix+=","
