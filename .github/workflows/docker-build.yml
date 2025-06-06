@@ -1,0 +1,90 @@
+name: Docker Build for Changed Microservices
+
+on:
+  push:
+    paths:
+      - 'app/**'
+
+jobs:
+  detect:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.get-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Determine Changed Services
+        id: get-matrix
+        shell: bash
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "Detecting changes..."
+          CHANGED_FOLDERS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} app | awk -F/ '!($2 ~ /^(Dockerfile|SomeFileYouDoNotWantToDetect|Makefile)$/) {print $2}' | sort -u | xargs)
+          echo "Changed folders: $CHANGED_FOLDERS"
+
+          CHANGED_SERVICES=$(echo "$CHANGED_FOLDERS" | grep "^app/" | awk -F'/' '{print $2}' | sort -u)
+          echo "Changed services: $CHANGED_SERVICES"
+
+          matrix="{\"include\": ["
+          first=1
+          for service in $CHANGED_SERVICES; do
+            if [ -f "app/${service}/Dockerfile" ]; then
+              if [ $first -eq 0 ]; then
+                matrix+=","
+              fi
+              matrix+="{\"service\": \"${service}\"}"
+              first=0
+            fi
+          done
+          matrix+="]}"
+          
+          echo "Matrix for build job: $matrix"
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+
+      - name: Validate Matrix
+        if: ${{ steps.get-matrix.outputs.matrix == '{"include": []}' }}
+        run: |
+          echo "No services with a Dockerfile were changed. Exiting."
+          exit 1
+
+  build:
+    name: Build & Push Docker Images
+    needs: detect
+    runs-on: ubuntu-latest
+    if: ${{ needs.detect.outputs.matrix != '{"include": []}' }}
+    strategy:
+      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ env.DMgmt
+          password: ${{ env.DOCKER_PASSWORD }}
+
+      - name: Build and Push Docker Image for ${{ matrix.service }}
+        uses: docker/build-push-action@v4
+        with:
+          context: ./app/${{ matrix.service }}
+          file: ./app/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: your-dockerhub-username/${{ matrix.service }}:${{ github.sha }},your-dockerhub-username/${{ matrix.service }}:latest
+
+      - name: Trigger ArgoCD Deployment for ${{ matrix.service }}
+        env:
+          ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+        run: |
+          curl -H "Authorization: Bearer ${ARGOCD_TOKEN}"           -X POST "https://${ARGOCD_SERVER}/api/v1/applications/your-argocd-app-${{ matrix.service }}/sync"
