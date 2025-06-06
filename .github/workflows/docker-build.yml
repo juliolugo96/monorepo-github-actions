@@ -43,10 +43,10 @@ jobs:
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
 
       - name: Validate Matrix
-        if: ${{ fromJson(steps.get-matrix.outputs.matrix).include.length == 0 }}
+        if: ${{ fromJson(steps.get-matrix.outputs.matrix).include | length == 0 }}
         run: |
-          echo "No services with a Dockerfile were changed. Exiting."
-          exit 1
+          echo "No services with a Dockerfile were changed. Exiting gracefully."
+          exit 0
 
   build:
     name: Build & Push Docker Images
